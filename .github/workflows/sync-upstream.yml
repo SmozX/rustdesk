@@ -1,0 +1,412 @@
+name: Sync Upstream RustDesk Release
+
+on:
+  schedule:
+    # GitHub Actions cron uses UTC.
+    # 00:20 UTC = 08:20 Singapore / China time.
+    - cron: "20 0 * * *"
+
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: "Rebuild latest stable release even if its build branch already exists"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-upstream-rustdesk-release
+  cancel-in-progress: false
+
+jobs:
+  prepare-and-dispatch:
+    name: Prepare latest upstream release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate automation configuration
+        shell: bash
+        env:
+          WORKFLOW_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          RENDEZVOUS_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
+          PRIVATE_RELEASE_REPO: ${{ vars.PRIVATE_RELEASE_REPO }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$WORKFLOW_TOKEN" ]]; then
+            echo "::error::WORKFLOW_TOKEN secret is missing."
+            exit 1
+          fi
+
+          if [[ -z "$RELEASE_TOKEN" ]]; then
+            echo "::error::RELEASE_TOKEN secret is missing."
+            exit 1
+          fi
+
+          if [[ -z "$RENDEZVOUS_SERVER" ]]; then
+            echo "::error::RENDEZVOUS_SERVER secret is missing."
+            exit 1
+          fi
+
+          if [[ -z "$RS_PUB_KEY" ]]; then
+            echo "::error::RS_PUB_KEY secret is missing."
+            exit 1
+          fi
+
+          if [[ -z "$PRIVATE_RELEASE_REPO" ]]; then
+            echo "::error::PRIVATE_RELEASE_REPO variable is missing."
+            exit 1
+          fi
+
+          if [[ "$PRIVATE_RELEASE_REPO" != */* ]]; then
+            echo "::error::PRIVATE_RELEASE_REPO must use owner/repository format."
+            exit 1
+          fi
+
+          echo "Automation configuration validation passed."
+
+      - name: Checkout personal fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          token: ${{ secrets.WORKFLOW_TOKEN }}
+
+      - name: Validate personal automation files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          REQUIRED_FILES=(
+            ".github/scripts/patch-secrets.py"
+            ".github/scripts/inject-personal-build.py"
+            ".github/workflows/personal-build.yml"
+            ".github/workflows/sync-upstream.yml"
+          )
+
+          for FILE in "${REQUIRED_FILES[@]}"; do
+            if [[ ! -f "$FILE" ]]; then
+              echo "::error::Required automation file is missing: $FILE"
+              exit 1
+            fi
+          done
+
+          echo "All personal automation files are present."
+
+      - name: Get latest stable RustDesk release
+        id: upstream
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          LATEST_TAG="$(
+            curl \
+              --fail \
+              --silent \
+              --show-error \
+              --location \
+              --retry 3 \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/rustdesk/rustdesk/releases/latest" \
+            | python3 -c '
+          import json
+          import sys
+
+          data = json.load(sys.stdin)
+          tag = data.get("tag_name", "")
+
+          if not tag:
+              raise SystemExit("Latest RustDesk release has no tag_name.")
+
+          print(tag)
+          '
+          )"
+
+          if [[ ! "$LATEST_TAG" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::Unexpected upstream tag format: $LATEST_TAG"
+            exit 1
+          fi
+
+          BUILD_BRANCH="personal-build/upstream-${LATEST_TAG}"
+          RELEASE_TAG="personal-${LATEST_TAG}"
+
+          echo "Latest stable RustDesk release: $LATEST_TAG"
+          echo "Build branch: $BUILD_BRANCH"
+          echo "Private release tag: $RELEASE_TAG"
+
+          echo "tag=$LATEST_TAG" >> "$GITHUB_OUTPUT"
+          echo "build_branch=$BUILD_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Determine whether preparation is required
+        id: decision
+        shell: bash
+        env:
+          BUILD_BRANCH: ${{ steps.upstream.outputs.build_branch }}
+          FORCE_REBUILD: ${{ github.event_name == 'workflow_dispatch' && inputs.force_rebuild || false }}
+        run: |
+          set -euo pipefail
+
+          PREPARE="false"
+          DISPATCH="false"
+
+          if git ls-remote \
+            --exit-code \
+            --heads \
+            origin \
+            "refs/heads/${BUILD_BRANCH}" \
+            >/dev/null 2>&1
+          then
+            echo "Build branch already exists: $BUILD_BRANCH"
+
+            if [[ "$FORCE_REBUILD" == "true" ]]; then
+              echo "Force rebuild requested."
+              DISPATCH="true"
+            else
+              echo "This upstream release has already been prepared."
+              echo "No new build will be started."
+            fi
+          else
+            echo "New upstream stable release detected."
+            PREPARE="true"
+            DISPATCH="true"
+          fi
+
+          echo "prepare=$PREPARE" >> "$GITHUB_OUTPUT"
+          echo "dispatch=$DISPATCH" >> "$GITHUB_OUTPUT"
+
+      - name: Preserve personal automation files
+        if: steps.decision.outputs.prepare == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PERSONAL_DIR="${RUNNER_TEMP}/rustdesk-personal-automation"
+
+          rm -rf "$PERSONAL_DIR"
+
+          mkdir -p \
+            "$PERSONAL_DIR/.github/scripts" \
+            "$PERSONAL_DIR/.github/workflows"
+
+          cp \
+            .github/scripts/patch-secrets.py \
+            "$PERSONAL_DIR/.github/scripts/patch-secrets.py"
+
+          cp \
+            .github/scripts/inject-personal-build.py \
+            "$PERSONAL_DIR/.github/scripts/inject-personal-build.py"
+
+          cp \
+            .github/workflows/personal-build.yml \
+            "$PERSONAL_DIR/.github/workflows/personal-build.yml"
+
+          cp \
+            .github/workflows/sync-upstream.yml \
+            "$PERSONAL_DIR/.github/workflows/sync-upstream.yml"
+
+          echo "Personal automation files preserved."
+
+      - name: Fetch official RustDesk release
+        if: steps.decision.outputs.prepare == 'true'
+        shell: bash
+        env:
+          UPSTREAM_TAG: ${{ steps.upstream.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          if git remote get-url upstream >/dev/null 2>&1; then
+            git remote set-url \
+              upstream \
+              https://github.com/rustdesk/rustdesk.git
+          else
+            git remote add \
+              upstream \
+              https://github.com/rustdesk/rustdesk.git
+          fi
+
+          git fetch \
+            --force \
+            upstream \
+            "refs/tags/${UPSTREAM_TAG}:refs/tags/${UPSTREAM_TAG}"
+
+          git rev-parse --verify "refs/tags/${UPSTREAM_TAG}"
+
+          echo "Official RustDesk tag fetched successfully."
+
+      - name: Create clean personal build branch
+        if: steps.decision.outputs.prepare == 'true'
+        shell: bash
+        env:
+          UPSTREAM_TAG: ${{ steps.upstream.outputs.tag }}
+          BUILD_BRANCH: ${{ steps.upstream.outputs.build_branch }}
+        run: |
+          set -euo pipefail
+
+          PERSONAL_DIR="${RUNNER_TEMP}/rustdesk-personal-automation"
+
+          git switch --detach "refs/tags/${UPSTREAM_TAG}"
+          git switch -c "$BUILD_BRANCH"
+
+          mkdir -p \
+            .github/scripts \
+            .github/workflows
+
+          cp \
+            "$PERSONAL_DIR/.github/scripts/patch-secrets.py" \
+            .github/scripts/patch-secrets.py
+
+          cp \
+            "$PERSONAL_DIR/.github/scripts/inject-personal-build.py" \
+            .github/scripts/inject-personal-build.py
+
+          cp \
+            "$PERSONAL_DIR/.github/workflows/personal-build.yml" \
+            .github/workflows/personal-build.yml
+
+          cp \
+            "$PERSONAL_DIR/.github/workflows/sync-upstream.yml" \
+            .github/workflows/sync-upstream.yml
+
+          echo "Personal automation files restored."
+
+      - name: Inject personal build configuration
+        if: steps.decision.outputs.prepare == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 .github/scripts/inject-personal-build.py
+
+          echo
+          echo "Injection completed."
+
+      - name: Validate prepared workflow
+        if: steps.decision.outputs.prepare == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          WORKFLOW=".github/workflows/flutter-build.yml"
+
+          PATCH_COUNT="$(
+            grep -c 'PERSONAL_BUILD_SECRETS_PATCH' "$WORKFLOW" || true
+          )"
+
+          RELEASE_COUNT="$(
+            grep -c 'PERSONAL_BUILD_PRIVATE_RELEASE' "$WORKFLOW" || true
+          )"
+
+          if [[ "$PATCH_COUNT" -lt 1 ]]; then
+            echo "::error::No personal server patch steps were injected."
+            exit 1
+          fi
+
+          if [[ "$RELEASE_COUNT" -lt 1 ]]; then
+            echo "::error::No private Release targets were injected."
+            exit 1
+          fi
+
+          if ! grep -Fq 'PRIVATE_RELEASE_REPO' "$WORKFLOW"; then
+            echo "::error::PRIVATE_RELEASE_REPO was not injected."
+            exit 1
+          fi
+          
+          if ! grep -Fq 'RELEASE_TOKEN' "$WORKFLOW"; then
+            echo "::error::RELEASE_TOKEN was not injected."
+            exit 1
+          fi
+
+          echo "Prepared workflow validation passed."
+          echo "Personal server patch steps: $PATCH_COUNT"
+          echo "Private Release steps: $RELEASE_COUNT"
+
+      - name: Commit personal build branch
+        if: steps.decision.outputs.prepare == 'true'
+        shell: bash
+        env:
+          UPSTREAM_TAG: ${{ steps.upstream.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          git config \
+            user.name \
+            "github-actions[bot]"
+
+          git config \
+            user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            .github/scripts/patch-secrets.py \
+            .github/scripts/inject-personal-build.py \
+            .github/workflows/personal-build.yml \
+            .github/workflows/sync-upstream.yml \
+            .github/workflows/flutter-build.yml
+
+          echo "Files prepared for commit:"
+          git status --short
+
+          git commit \
+            -m "Prepare personal build for RustDesk ${UPSTREAM_TAG}"
+
+      - name: Push personal build branch
+        if: steps.decision.outputs.prepare == 'true'
+        shell: bash
+        env:
+          BUILD_BRANCH: ${{ steps.upstream.outputs.build_branch }}
+        run: |
+          set -euo pipefail
+
+          git push \
+            --set-upstream \
+            origin \
+            "$BUILD_BRANCH"
+
+          echo "Personal build branch pushed successfully."
+
+      - name: Trigger personal all-platform build
+        if: steps.decision.outputs.dispatch == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
+          BUILD_BRANCH: ${{ steps.upstream.outputs.build_branch }}
+          RELEASE_TAG: ${{ steps.upstream.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          echo "Triggering Personal RustDesk Build"
+          echo "Branch: $BUILD_BRANCH"
+          echo "Private Release tag: $RELEASE_TAG"
+
+          gh workflow run \
+            personal-build.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$BUILD_BRANCH" \
+            -f "release_tag=$RELEASE_TAG"
+
+          echo "Personal RustDesk Build dispatched successfully."
+
+      - name: Summary
+        shell: bash
+        env:
+          UPSTREAM_TAG: ${{ steps.upstream.outputs.tag }}
+          BUILD_BRANCH: ${{ steps.upstream.outputs.build_branch }}
+          RELEASE_TAG: ${{ steps.upstream.outputs.release_tag }}
+          PREPARE: ${{ steps.decision.outputs.prepare }}
+          DISPATCH: ${{ steps.decision.outputs.dispatch }}
+        run: |
+          {
+            echo "## RustDesk upstream synchronization"
+            echo
+            echo "- Upstream stable release: \`$UPSTREAM_TAG\`"
+            echo "- Personal build branch: \`$BUILD_BRANCH\`"
+            echo "- Private Release tag: \`$RELEASE_TAG\`"
+            echo "- New branch prepared: \`$PREPARE\`"
+            echo "- Build dispatched: \`$DISPATCH\`"
+          } >> "$GITHUB_STEP_SUMMARY"
