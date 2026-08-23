@@ -1,0 +1,137 @@
+name: Personal RustDesk Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Private release tag"
+        required: true
+        default: "personal-manual"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: personal-rustdesk-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate personal build configuration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout build branch
+        uses: actions/checkout@v4
+
+      - name: Validate injected workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          WORKFLOW=".github/workflows/flutter-build.yml"
+
+          if [[ ! -f "$WORKFLOW" ]]; then
+            echo "::error::flutter-build.yml was not found."
+            exit 1
+          fi
+
+          PATCH_COUNT="$(grep -c 'PERSONAL_BUILD_SECRETS_PATCH' "$WORKFLOW" || true)"
+          RELEASE_COUNT="$(grep -c 'PERSONAL_BUILD_PRIVATE_RELEASE' "$WORKFLOW" || true)"
+
+          if [[ "$PATCH_COUNT" -lt 1 ]]; then
+            echo "::error::The selected branch has not been prepared by inject-personal-build.py."
+            echo "::error::Do not run Personal Build directly from an unpatched upstream/master branch."
+            exit 1
+          fi
+
+          if [[ "$RELEASE_COUNT" -lt 1 ]]; then
+            echo "::error::No private Release redirection was found."
+            echo "::error::Refusing to build because binaries could otherwise be published publicly."
+            exit 1
+          fi
+
+          if grep -q 'PERSONAL_BUILD_PRIVATE_RELEASE' "$WORKFLOW"; then
+            if ! grep -q '\${{ vars.PRIVATE_RELEASE_REPO }}' "$WORKFLOW"; then
+              echo "::error::PRIVATE_RELEASE_REPO is not referenced by the injected workflow."
+              exit 1
+            fi
+
+            if ! grep -q '\${{ secrets.RELEASE_TOKEN }}' "$WORKFLOW"; then
+              echo "::error::RELEASE_TOKEN is not referenced by the injected workflow."
+              exit 1
+            fi
+          fi
+
+          echo "Injected workflow validation passed."
+          echo "Secret patch steps: $PATCH_COUNT"
+          echo "Private release steps: $RELEASE_COUNT"
+
+      - name: Validate required Secrets and Variables
+        shell: bash
+        env:
+          RENDEZVOUS_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          PRIVATE_RELEASE_REPO: ${{ vars.PRIVATE_RELEASE_REPO }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$RENDEZVOUS_SERVER" ]]; then
+            echo "::error::RENDEZVOUS_SERVER secret is missing."
+            exit 1
+          fi
+
+          if [[ -z "$RS_PUB_KEY" ]]; then
+            echo "::error::RS_PUB_KEY secret is missing."
+            exit 1
+          fi
+
+          if [[ -z "$RELEASE_TOKEN" ]]; then
+            echo "::error::RELEASE_TOKEN secret is missing."
+            exit 1
+          fi
+
+          if [[ -z "$PRIVATE_RELEASE_REPO" ]]; then
+            echo "::error::PRIVATE_RELEASE_REPO variable is missing."
+            exit 1
+          fi
+
+          if [[ "$PRIVATE_RELEASE_REPO" != */* ]]; then
+            echo "::error::PRIVATE_RELEASE_REPO must use owner/repository format."
+            exit 1
+          fi
+
+          echo "Required Secrets and Variables are configured."
+
+      - name: Validate release tag
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$RELEASE_TAG" ]]; then
+            echo "::error::Release tag cannot be empty."
+            exit 1
+          fi
+
+          if [[ "$RELEASE_TAG" =~ [[:space:]] ]]; then
+            echo "::error::Release tag must not contain spaces."
+            exit 1
+          fi
+
+          echo "Release tag validation passed."
+
+  build:
+    name: Build all RustDesk platforms
+    needs: validate
+
+    uses: ./.github/workflows/flutter-build.yml
+
+    with:
+      upload-artifact: true
+      upload-tag: ${{ inputs.release_tag }}
+
+    secrets: inherit
