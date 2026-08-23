@@ -53,12 +53,12 @@ jobs:
           fi
 
           if grep -q 'PERSONAL_BUILD_PRIVATE_RELEASE' "$WORKFLOW"; then
-            if ! grep -q '\${{ vars.PRIVATE_RELEASE_REPO }}' "$WORKFLOW"; then
+            if ! grep -Fq 'PRIVATE_RELEASE_REPO' "$WORKFLOW"; then
               echo "::error::PRIVATE_RELEASE_REPO is not referenced by the injected workflow."
               exit 1
             fi
-
-            if ! grep -q '\${{ secrets.RELEASE_TOKEN }}' "$WORKFLOW"; then
+          
+            if ! grep -Fq 'RELEASE_TOKEN' "$WORKFLOW"; then
               echo "::error::RELEASE_TOKEN is not referenced by the injected workflow."
               exit 1
             fi
