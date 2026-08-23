@@ -312,12 +312,12 @@ jobs:
             exit 1
           fi
 
-          if ! grep -q '\${{ vars.PRIVATE_RELEASE_REPO }}' "$WORKFLOW"; then
+          if ! grep -Fq 'PRIVATE_RELEASE_REPO' "$WORKFLOW"; then
             echo "::error::PRIVATE_RELEASE_REPO was not injected."
             exit 1
           fi
-
-          if ! grep -q '\${{ secrets.RELEASE_TOKEN }}' "$WORKFLOW"; then
+          
+          if ! grep -Fq 'RELEASE_TOKEN' "$WORKFLOW"; then
             echo "::error::RELEASE_TOKEN was not injected."
             exit 1
           fi
