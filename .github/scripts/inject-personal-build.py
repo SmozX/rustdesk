@@ -133,29 +133,83 @@ def inject_secret_patch_steps(lines: list[str]) -> tuple[list[str], int]:
             "flutter-build.yml. Upstream structure may have changed."
         )
 
+    # Only patch checkout steps that actually fetch submodules recursively.
+    # A normal checkout may be conditional and may not even fetch hbb_common.
+    target_checkouts: list[tuple[int, int, int, str | None]] = []
+
+    for checkout_index in checkout_indexes:
+        step_start, step_indent = find_step_start(
+            lines,
+            checkout_index,
+        )
+
+        step_end = find_step_end(
+            lines,
+            step_start,
+            step_indent,
+        )
+
+        block = lines[step_start:step_end]
+
+        has_recursive_submodules = False
+        checkout_if = None
+
+        for line in block:
+            if not is_active_line(line):
+                continue
+
+            stripped = line.strip()
+
+            if stripped == "submodules: recursive":
+                has_recursive_submodules = True
+
+            # Preserve a conditional checkout condition on our patch step.
+            if (
+                indent_of(line) == step_indent + 2
+                and stripped.startswith("if:")
+            ):
+                checkout_if = stripped
+
+        if has_recursive_submodules:
+            target_checkouts.append(
+                (
+                    checkout_index,
+                    step_start,
+                    step_indent,
+                    checkout_if,
+                )
+            )
+
+    if not target_checkouts:
+        fail(
+            "No recursive actions/checkout step was found. "
+            "Upstream flutter-build.yml may have been restructured."
+        )
+
     marker_count = sum(PATCH_MARKER in line for line in lines)
 
     if marker_count:
-        if marker_count == len(checkout_indexes):
+        if marker_count == len(target_checkouts):
             print(
                 f"Secret patch steps already present "
-                f"({marker_count} checkout step(s))."
+                f"({marker_count} recursive checkout step(s))."
             )
             return lines, marker_count
 
         fail(
             "A partially injected secret-patch configuration was found: "
             f"{marker_count} marker(s) for "
-            f"{len(checkout_indexes)} checkout step(s). "
+            f"{len(target_checkouts)} recursive checkout step(s). "
             "Refusing to modify the workflow automatically."
         )
 
     # Work backwards so insertion does not invalidate earlier indexes.
-    for checkout_index in reversed(checkout_indexes):
-        step_start, step_indent = find_step_start(
-            lines,
-            checkout_index,
-        )
+    for (
+        checkout_index,
+        step_start,
+        step_indent,
+        checkout_if,
+    ) in reversed(target_checkouts):
 
         step_end = find_step_end(
             lines,
@@ -170,28 +224,37 @@ def inject_secret_patch_steps(lines: list[str]) -> tuple[list[str], int]:
         patch_step = [
             f"{base}- name: Apply personal RustDesk server configuration\n",
             f"{child}{PATCH_MARKER}\n",
-            f"{child}shell: bash\n",
-            f"{child}env:\n",
-            f"{grandchild}RENDEZVOUS_SERVER: "
-            "${{ secrets.RENDEZVOUS_SERVER }}\n",
-            f"{grandchild}RS_PUB_KEY: "
-            "${{ secrets.RS_PUB_KEY }}\n",
-            f"{child}run: |\n",
-            f"{grandchild}git submodule update --init --recursive "
-            "libs/hbb_common\n",
-            f"{grandchild}python3 "
-            ".github/scripts/patch-secrets.py\n",
         ]
+
+        # If upstream checkout is conditional, patch must use the same
+        # condition. Otherwise checkout could be skipped while patch runs.
+        if checkout_if is not None:
+            patch_step.append(
+                f"{child}{checkout_if}\n"
+            )
+
+        patch_step.extend(
+            [
+                f"{child}shell: bash\n",
+                f"{child}env:\n",
+                f"{grandchild}RENDEZVOUS_SERVER: "
+                "${{ secrets.RENDEZVOUS_SERVER }}\n",
+                f"{grandchild}RS_PUB_KEY: "
+                "${{ secrets.RS_PUB_KEY }}\n",
+                f"{child}run: |\n",
+                f"{grandchild}python3 "
+                ".github/scripts/patch-secrets.py\n",
+            ]
+        )
 
         lines[step_end:step_end] = patch_step
 
     print(
         f"Injected secret patch after "
-        f"{len(checkout_indexes)} checkout step(s)."
+        f"{len(target_checkouts)} recursive checkout step(s)."
     )
 
-    return lines, len(checkout_indexes)
-
+    return lines, len(target_checkouts)
 
 def inject_private_release_targets(
     lines: list[str],
