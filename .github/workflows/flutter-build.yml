@@ -111,6 +111,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Apply personal RustDesk server configuration
+        # PERSONAL_BUILD_SECRETS_PATCH
+        shell: bash
+        env:
+          RENDEZVOUS_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
+        run: |
+          python3 .github/scripts/patch-secrets.py
       - name: Install Syft
         uses: anchore/sbom-action/download-syft@v0
 
@@ -123,6 +131,9 @@ jobs:
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         if: env.UPLOAD_ARTIFACT == 'true'
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -195,6 +206,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Apply personal RustDesk server configuration
+        # PERSONAL_BUILD_SECRETS_PATCH
+        shell: bash
+        env:
+          RENDEZVOUS_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
+        run: |
+          python3 .github/scripts/patch-secrets.py
       - name: Restore bridge files
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -573,6 +592,9 @@ jobs:
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         if: env.UPLOAD_ARTIFACT == 'true' && env.PUBLISH_UPDATE_METADATA != 'true'
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -612,6 +634,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Apply personal RustDesk server configuration
+        # PERSONAL_BUILD_SECRETS_PATCH
+        shell: bash
+        env:
+          RENDEZVOUS_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
+        run: |
+          python3 .github/scripts/patch-secrets.py
       - name: Install LLVM and Clang
         uses: rustdesk-org/install-llvm-action-32bit@6aa7d9ad3df84dff01cd4596dd0fc880a7f47fce # no release tag; commit 2026-05-26
         with:
@@ -787,6 +817,9 @@ jobs:
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         if: env.UPLOAD_ARTIFACT == 'true' && env.PUBLISH_UPDATE_METADATA != 'true'
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -823,6 +856,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Apply personal RustDesk server configuration
+        # PERSONAL_BUILD_SECRETS_PATCH
+        shell: bash
+        env:
+          RENDEZVOUS_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
+        run: |
+          python3 .github/scripts/patch-secrets.py
       - name: Install flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
@@ -952,6 +993,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Apply personal RustDesk server configuration
+        # PERSONAL_BUILD_SECRETS_PATCH
+        shell: bash
+        env:
+          RENDEZVOUS_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
+        run: |
+          python3 .github/scripts/patch-secrets.py
       - name: Import the codesign cert
         if: env.MACOS_P12_BASE64 != null
         uses: apple-actions/import-codesign-certs@253ddeeac23f2bdad1646faac5c8c2832e800071 # v1
@@ -1198,6 +1247,9 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true' && env.PUBLISH_UPDATE_METADATA != 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -1307,6 +1359,9 @@ jobs:
       - name: Upload signed update artifacts
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           fail_on_unmatched_files: true
           tag_name: ${{ env.TAG_NAME }}
@@ -1324,6 +1379,9 @@ jobs:
       - name: Upload signed update metadata signature
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           fail_on_unmatched_files: true
           tag_name: ${{ env.TAG_NAME }}
@@ -1333,6 +1391,9 @@ jobs:
       - name: Publish signed update metadata
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           fail_on_unmatched_files: true
           tag_name: ${{ env.TAG_NAME }}
@@ -1420,6 +1481,9 @@ jobs:
       - name: Publish unsigned app
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
           files: rustdesk-${{ env.VERSION }}-unsigned.tar.gz
@@ -1511,6 +1575,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Apply personal RustDesk server configuration
+        # PERSONAL_BUILD_SECRETS_PATCH
+        shell: bash
+        env:
+          RENDEZVOUS_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
+        run: |
+          python3 .github/scripts/patch-secrets.py
       - name: Install flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
@@ -1703,6 +1775,9 @@ jobs:
         if: env.ANDROID_SIGNING_KEY != null && env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -1712,6 +1787,9 @@ jobs:
         if: env.ANDROID_SIGNING_KEY == null && env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -1784,6 +1862,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Apply personal RustDesk server configuration
+        # PERSONAL_BUILD_SECRETS_PATCH
+        shell: bash
+        env:
+          RENDEZVOUS_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
+        run: |
+          python3 .github/scripts/patch-secrets.py
       - name: Install flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
@@ -1888,6 +1974,9 @@ jobs:
         if: env.ANDROID_SIGNING_KEY != null && env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -1897,6 +1986,9 @@ jobs:
         if: env.ANDROID_SIGNING_KEY == null && env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -1951,6 +2043,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Apply personal RustDesk server configuration
+        # PERSONAL_BUILD_SECRETS_PATCH
+        shell: bash
+        env:
+          RENDEZVOUS_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
+        run: |
+          python3 .github/scripts/patch-secrets.py
       - name: Set Swap Space
         uses: pierotofy/set-swap-space@49819abfb41bd9b44fb781159c033dba90353a7c # v1.0
         with:
@@ -2205,6 +2305,9 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -2241,6 +2344,9 @@ jobs:
         if: matrix.job.arch == 'x86_64' && env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -2277,6 +2383,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Apply personal RustDesk server configuration
+        # PERSONAL_BUILD_SECRETS_PATCH
+        shell: bash
+        env:
+          RENDEZVOUS_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
+        run: |
+          python3 .github/scripts/patch-secrets.py
       - name: Set Swap Space
         uses: pierotofy/set-swap-space@49819abfb41bd9b44fb781159c033dba90353a7c # v1.0
         with:
@@ -2556,6 +2670,9 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -2613,6 +2730,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Apply personal RustDesk server configuration
+        # PERSONAL_BUILD_SECRETS_PATCH
+        shell: bash
+        env:
+          RENDEZVOUS_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
+        run: |
+          python3 .github/scripts/patch-secrets.py
       - name: Modify vcpkg.json for armv7
         if: matrix.job.vcpkg-triplet == 'arm-linux'
         run: |
@@ -2801,6 +2926,9 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -2830,6 +2958,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Apply personal RustDesk server configuration
+        # PERSONAL_BUILD_SECRETS_PATCH
+        shell: bash
+        env:
+          RENDEZVOUS_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
+        run: |
+          python3 .github/scripts/patch-secrets.py
       - name: Download Binary
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -2861,6 +2997,9 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -2906,6 +3045,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Apply personal RustDesk server configuration
+        # PERSONAL_BUILD_SECRETS_PATCH
+        shell: bash
+        env:
+          RENDEZVOUS_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
+        run: |
+          python3 .github/scripts/patch-secrets.py
       - name: Download Binary
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -2946,6 +3093,9 @@ jobs:
       - name: Publish flatpak package
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -2968,6 +3118,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Apply personal RustDesk server configuration
+        # PERSONAL_BUILD_SECRETS_PATCH
+        shell: bash
+        env:
+          RENDEZVOUS_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          RS_PUB_KEY: ${{ secrets.RS_PUB_KEY }}
+        run: |
+          python3 .github/scripts/patch-secrets.py
       - name: Prepare env
         run: |
           sudo apt-get update -y
@@ -3031,6 +3189,9 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
+          # PERSONAL_BUILD_PRIVATE_RELEASE
+          repository: ${{ vars.PRIVATE_RELEASE_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
